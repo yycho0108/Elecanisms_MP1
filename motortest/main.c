@@ -62,7 +62,7 @@ void brake(Motor* m){
 /* MOTOR END */
 
 /* Behaviors BEGIN */
-void sweep(float* speed, float* ds, float lim=1.0){
+void sweep(float* speed, float* ds, float lim){
 	lim = lim>0?lim:-lim;
 
 	*speed += *ds;
@@ -103,7 +103,7 @@ int16_t main(void) {
         if (timer_flag(&timer1)) {
             timer_lower(&timer1);
 			drive(&m1, speed);
-			sweep(&speed,&ds);
+			sweep(&speed,&ds,1.0);
         }
     }
 }
