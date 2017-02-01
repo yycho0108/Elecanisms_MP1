@@ -2,6 +2,8 @@
 import numpy as np
 import usb.core
 import time
+import signal, sys
+
 
 def parse_angle(angleBytes):
     angle_enc = int(angleBytes[0])+int(angleBytes[1])*256
@@ -104,7 +106,18 @@ class encodertest:
         else:
             return ret
 
+angles = []
+times = []
+
+def sigint_handler(signal, frame):
+    data = np.c_[angles, times]
+    np.savetxt('angles.csv', data, delimiter=',')
+    sys.exit(0)
+
 if __name__ == "__main__":
+
+    signal.signal(signal.SIGINT, sigint_handler)
+
     t = encodertest()
     bias = 97.54
     #print parse_angle(t.enc_setZero())
@@ -113,6 +126,10 @@ if __name__ == "__main__":
     full = False
     while True:
         ang = -(parse_angle(t.enc_readReg(t.ENC_ANGLE_AFTER_ZERO_POS_ADDER)) - bias)
+        
+        angles.append(ang)
+        times.append(time.time())
+
         hist[idx] = ang
         idx += 1
         if idx >= 100:

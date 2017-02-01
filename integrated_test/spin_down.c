@@ -7,18 +7,20 @@
 #include "pin.h"
 #include "spi.h"
 
+#include "timer.h"
+#include "oc.h"
+#include "motor.h"
+
+
 #define TOGGLE_LED1         1
 #define TOGGLE_LED2         2
 #define READ_SW1            3
 #define ENC_READ_REG        5
-#define ENC_CLEAR_ERR       6
 #define TOGGLE_LED3         8
 #define READ_SW2            9
 #define READ_SW3            10
 
 #define REG_MAG_ADDR        0x3FFE
-#define REG_ANG_ADDR 0x3FFF
-#define MASK     0x3FFF
 
 _PIN *ENC_SCK, *ENC_MISO, *ENC_MOSI;
 _PIN *ENC_NCS;
@@ -28,7 +30,7 @@ WORD enc_readReg(WORD address) {
     cmd.w = 0x4000|address.w; //set 2nd MSB to 1 for a read
     cmd.w |= parity(cmd.w)<<15; //calculate even parity for
 
-    pin_clear(ENC_NCS); // ACTIVE LOW
+    pin_clear(ENC_NCS);
     spi_transfer(&spi1, cmd.b[1]);
     spi_transfer(&spi1, cmd.b[0]);
     pin_set(ENC_NCS);
@@ -38,13 +40,6 @@ WORD enc_readReg(WORD address) {
     result.b[0] = spi_transfer(&spi1, 0);
     pin_set(ENC_NCS);
     return result;
-    //return (WORD)(result.w & MASK);
-}
-
-WORD enc_clearErr(){
-    WORD addr;
-    addr.w = 0x0001;
-    return enc_readReg(addr);
 }
 
 //void ClassRequests(void) {
@@ -76,13 +71,6 @@ void VendorRequests(void) {
             break;
         case ENC_READ_REG:
             result = enc_readReg(USB_setup.wValue);
-            BD[EP0IN].address[0] = result.b[0];
-            BD[EP0IN].address[1] = result.b[1];
-            BD[EP0IN].bytecount = 2;         // set EP0 IN byte count to 1
-            BD[EP0IN].status = 0xC8;         // send packet as DATA1, set UOWN bit
-            break;
-        case ENC_CLEAR_ERR:
-            result = enc_clearErr();
             BD[EP0IN].address[0] = result.b[0];
             BD[EP0IN].address[1] = result.b[1];
             BD[EP0IN].bytecount = 2;         // set EP0 IN byte count to 1
@@ -131,8 +119,12 @@ int16_t main(void) {
     init_clock();
     init_ui();
     init_pin();
-    init_timer();
     init_spi();
+
+    init_timer();
+    init_oc();
+    init_motors();
+
 
     ENC_MISO = &D[1];
     ENC_MOSI = &D[0];
@@ -141,13 +133,22 @@ int16_t main(void) {
 
     pin_digitalOut(ENC_NCS);
     pin_set(ENC_NCS);
+
     spi_open(&spi1, ENC_MISO, ENC_MOSI, ENC_SCK, 2e6, 1);
 
     InitUSB();                              // initialize the USB registers and serial interface engine
     while (USB_USWSTAT!=CONFIG_STATE) {     // while the peripheral is not configured...
-        ServiceUSB();                       // ...service USB requests
+        ServiceUSB();                      // ...service USB requests
+        
+
+        //if (sw_read(&sw1)==1)
+        //    drive(&m1, 1);
+        //else if (sw_read(&sw1)==0)
+        //    drive(&m1, 0);
     }
     while (1) {
         ServiceUSB();                       // service any pending USB requests
+        drive(&m1, !sw_read(&sw1));
+        led_write(&led3, !sw_read(&sw1));
     }
 }
