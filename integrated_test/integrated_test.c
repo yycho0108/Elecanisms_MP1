@@ -7,6 +7,8 @@
 #include "pin.h"
 #include "spi.h"
 
+#define MASK 0x3FFF
+
 // USB INTERFACE
 #define MAX_REG_FUNC 32
 typedef void (*ReqFun)(void);
@@ -16,7 +18,7 @@ uint8_t registeredFlags[MAX_REG_FUNC];
 void addRequestHandler(ReqFun req, uint8_t flag);
 extern uint8_t CUR_HANDLER_IDX;
 
-extern uint8_t CUR_HANDLER_IDX = 0;
+uint8_t CUR_HANDLER_IDX = 0;
 
 void addRequestHandler(ReqFun req, uint8_t flag){
 	registeredFunctions[CUR_HANDLER_IDX] = req;
@@ -24,6 +26,7 @@ void addRequestHandler(ReqFun req, uint8_t flag){
 }
 
 void VendorRequests(void){
+	// loop through handlers
 	for(int i=0; i<CUR_HANDLER_IDX; ++i){
 		if(USB_setup.bRequest == registeredFlags[CUR_HANDLER_IDX]){
 			registeredFunctions[i]();
@@ -51,9 +54,11 @@ WORD enc_readReg(WORD address) {
     result.b[1] = spi_transfer(&spi1, 0);
     result.b[0] = spi_transfer(&spi1, 0);
     pin_set(ENC_NCS);
+	result.w &= MASK;
 	return result;
-	//return (WORD)(result.w & MASK);
-}void init_enc(){
+}
+
+void init_enc(){
 
     ENC_MISO = &D[1];
     ENC_MOSI = &D[0];
@@ -64,7 +69,7 @@ WORD enc_readReg(WORD address) {
     pin_set(ENC_NCS);
     spi_open(&spi1, ENC_MISO, ENC_MOSI, ENC_SCK, 2e6, 1);
 
-	addRequestHandler(enc_readReg);
+	addRequestHandler(enc_readReg, ENC_READ_REG);
 }
 
 int16_t main(void){

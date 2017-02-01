@@ -108,7 +108,8 @@ class Orienter(object):
     def __init__(self):
         #self.rect = Rectifier('camera.yaml')
         self.history = CircleHistory(10,1000)
-        pass
+        self.prev_angle = None
+
     def get_orientation(self, rho, theta, r, frame=None):
         a = np.cos(theta)
         b = np.sin(theta)
@@ -179,7 +180,7 @@ class Orienter(object):
 
             if stable:
                 cx,cy,r = [int(e) for e in avg]
-                r_m = int(r*4/3) # r with margin
+                r_m = int(r*5/4) # r with margin
                 r = r_m
 
                 minx,maxx,miny,maxy = bounds(cx,cy,r_m)
@@ -187,14 +188,22 @@ class Orienter(object):
                 roi = img[miny:maxy, minx:maxx].copy() # region of interest
                 roi_hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
                 roi_proc = proc[miny:maxy, minx:maxx]
-                
+
+                ####
+                # Construct Mask
                 mask_ctrs = cv2.findContours(roi_proc.copy(), cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_NONE)[-2]
                 mask_roi = np.zeros(roi.shape[:-1], dtype=np.uint8)
+                mask_roi_2 = np.zeros(roi.shape[:-1], dtype=np.uint8)
+                cv2.circle(mask_roi,(r_m,r_m),r_m,255,thickness=-1)
 
                 for i in range(len(mask_ctrs)):
-                    if cv2.contourArea(mask_ctrs[i]) > 20*20:
-                        cv2.drawContours(mask_roi,mask_ctrs,i,255,-1)
+                    if cv2.contourArea(mask_ctrs[i]) > 50*50:
+                        cv2.drawContours(mask_roi_2,mask_ctrs,i,255,-1)
+
+                cv2.bitwise_and(mask_roi, mask_roi_2,mask_roi)
+
                 roi_masked = cv2.bitwise_and(roi, roi, mask=mask_roi)
+                ####
 
                 edges = cv2.Canny(mask_roi,0,255,apertureSize=3)
 
@@ -202,7 +211,12 @@ class Orienter(object):
 
                 if lines != None:
                     for rho,theta in lines[0]:
-                        res, angle = self.get_orientation(rho,theta,r_m,frame=roi)
+                        res, angle = self.get_orientation(rho,theta,r_m,frame=roi_masked)
+
+                        if self.prev_angle != None:
+                            # TODO : do something here
+                            pass
+
                     
                     if res == False:
                         return False, -1, None
@@ -211,13 +225,7 @@ class Orienter(object):
                     cv2.circle(img, (cx,cy), r,(0,255,0),2)
                     cv2.circle(img, (cx,cy), 2,(0,0,255),3)
 
-                    ctrs = cv2.findContours(roi_proc.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)[-2]
-
-                    roi_ctr = np.zeros(roi.shape[:-1])
-                    for i in range(len(ctrs)):
-                        #if cv2.contourArea(ctrs[i]) > 100*100:
-                        cv2.drawContours(roi_ctr,ctrs,i,255)
-                    return True, angle,(roi,roi_masked,proc,img)
+                    return True, angle,(edges,roi_masked,proc,img)
         return False, -1, None 
 
 

@@ -37,17 +37,19 @@ def main():
         res,angle_cam,frames = ori.apply(img,draw=True)
         if res: 
             roi, roi_masked, proc, img = frames
-            cv2.imshow('Orientation', roi)
+            angle_encs.append(angle_enc)
+            angle_cams.append(angle_cam)
+            angle_diffs.append(angle_enc - angle_cam)
+            cv2.imshow('Orientation', roi_masked)
         k = cv2.waitKey(20)
         if k == 27:
             break
         print 'enc : {}, cam : {}'.format(angle_enc, angle_cam)
-
-        angle_encs.append(angle_enc)
-        angle_cams.append(angle_cam)
-        angle_diffs.append(abs(angle_enc - angle_cam))
     
-    np.savetxt('calib.csv', np.c_[angle_encs,angle_cams,angle_diffs], header='angle_enc angle_cam absdiff')
+    angle_encs, angle_cams, angle_diffs = [np.unwrap(np.deg2rad(x)) for x in (angle_encs, angle_cams, angle_diffs)]
+    norm_data = np.c_[angle_encs, angle_cams, angle_diffs]
+
+    np.savetxt('calib.csv', norm_data, header='angle_enc angle_cam diff')
 
 
 if __name__ == "__main__":

@@ -15,10 +15,16 @@
 #define TOGGLE_LED3         8
 #define READ_SW2            9
 #define READ_SW3            10
+#define ENC_SET_ZERO        11
 
-#define REG_MAG_ADDR        0x3FFE
+#define REG_MAG_ADDR 0x3FFE
 #define REG_ANG_ADDR 0x3FFF
 #define MASK     0x3FFF
+
+#define REG_ZERO_HI 0x0016
+#define REG_ZERO_LO 0x0017
+
+// REG_ZERO_LO only uses the lower 6 LSBs
 
 _PIN *ENC_SCK, *ENC_MISO, *ENC_MOSI;
 _PIN *ENC_NCS;
@@ -37,8 +43,8 @@ WORD enc_readReg(WORD address) {
     result.b[1] = spi_transfer(&spi1, 0);
     result.b[0] = spi_transfer(&spi1, 0);
     pin_set(ENC_NCS);
+	result.w &= MASK;
 	return result;
-	//return (WORD)(result.w & MASK);
 }
 
 WORD enc_clearErr(){
@@ -46,6 +52,70 @@ WORD enc_clearErr(){
 	addr.w = 0x0001;
 	return enc_readReg(addr);
 }
+
+WORD transfer(WORD val){
+	WORD res;
+	pin_clear(ENC_NCS);
+	res.b[1] = spi_transfer(&spi1,val.b[1]);
+	res.b[0] = spi_transfer(&spi1,val.b[0]);
+    pin_set(ENC_NCS);
+	return res;
+}
+
+WORD enc_setZero(){
+	WORD addr = {0};
+	WORD pos = {0};
+	WORD res = {0};
+	WORD nop = {};
+
+	// Write 0 into zero position register to clear
+
+	pos.w = 0;
+	addr.w = REG_ZERO_HI;
+	addr.w |= parity(addr.w)<<15;
+	transfer(addr);
+	transfer(pos);
+	transfer(nop);
+
+	pos.w = 0;
+	addr.w = REG_ZERO_LO;
+	addr.w |= parity(addr.w)<<15;
+	transfer(addr);
+	transfer(pos);
+	transfer(nop);
+
+	// READ = x2
+	addr.w = REG_ANG_ADDR;
+	pos = enc_readReg(addr);
+	transfer(nop);
+
+	// SET HI
+	addr.w = REG_ZERO_HI;
+	addr.w |= parity(addr.w)<<15;
+	transfer(addr);
+
+	pin_clear(ENC_NCS);
+	spi_transfer(&spi1, 0);
+	spi_transfer(&spi1, pos.b[1]);
+	transfer(nop);
+
+	pin_set(ENC_NCS);
+
+	// SET LO
+	addr.w = REG_ZERO_LO;
+	addr.w |= parity(addr.w)<<15;
+	transfer(addr);
+
+	pin_clear(ENC_NCS);
+	spi_transfer(&spi1, 0);
+	spi_transfer(&spi1, pos.b[0]);
+	transfer(nop);
+
+	pin_set(ENC_NCS);
+
+	return pos;
+}
+
 
 //void ClassRequests(void) {
 //    switch (USB_setup.bRequest) {
@@ -83,6 +153,13 @@ void VendorRequests(void) {
             break;
 		case ENC_CLEAR_ERR:
 			result = enc_clearErr();
+            BD[EP0IN].address[0] = result.b[0];
+            BD[EP0IN].address[1] = result.b[1];
+            BD[EP0IN].bytecount = 2;         // set EP0 IN byte count to 1
+            BD[EP0IN].status = 0xC8;         // send packet as DATA1, set UOWN bit
+			break;
+		case ENC_SET_ZERO:
+			result = enc_setZero();
             BD[EP0IN].address[0] = result.b[0];
             BD[EP0IN].address[1] = result.b[1];
             BD[EP0IN].bytecount = 2;         // set EP0 IN byte count to 1
