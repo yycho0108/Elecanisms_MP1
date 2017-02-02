@@ -23,6 +23,7 @@ class encodertest:
         self.READ_SW2 = 9
         self.READ_SW3 = 10
         self.ENC_SET_ZERO=11
+        self.READ_I=12
         self.dev = usb.core.find(idVendor = 0x6666, idProduct = 0x0003)
         if self.dev is None:
             raise ValueError('no USB device found matching idVendor = 0x6666 and idProduct = 0x0003')
@@ -105,6 +106,13 @@ class encodertest:
             print "Could not send ENC_READ_REG vendor request."
         else:
             return ret
+    def readCurrent(self):
+        try:
+            ret = self.dev.ctrl_transfer(0xC0, self.READ_I, 0, 0, 2)
+        except usb.core.USBError:
+            print "Could not send READ_CURRENT vendor request."
+        else:
+            return ret
 
 angles = []
 times = []
@@ -124,20 +132,31 @@ if __name__ == "__main__":
     hist = [0 for _ in range(100)]
     idx = 0
     full = False
+    resistance = 75e-3
+
     while True:
-        ang = -(parse_angle(t.enc_readReg(t.ENC_ANGLE_AFTER_ZERO_POS_ADDER)) - bias)
+        l = []
+        for i in range(100):
+            res = t.readCurrent()
+            voltage = ((res[1]*256+res[0]) / float(0xFFFF) -0.5) * (1.65/.5) / 10.
+            current = voltage/resistance
+            l.append(current)
+        print np.mean(l)
         
-        angles.append(ang)
-        times.append(time.time())
 
-        hist[idx] = ang
-        idx += 1
-        if idx >= 100:
-            full = True
-            idx = 0
+        # ang = -(parse_angle(t.enc_readReg(t.ENC_ANGLE_AFTER_ZERO_POS_ADDER)) - bias)
+        
+        # angles.append(ang)
+        # times.append(time.time())
 
-        if full:
-            print np.mean(hist)
+        # hist[idx] = ang
+        # idx += 1
+        # if idx >= 100:
+        #     full = True
+        #     idx = 0
+
+        # if full:
+        #     print np.mean(hist)
 
     
     t.close()

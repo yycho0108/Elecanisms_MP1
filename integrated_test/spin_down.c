@@ -19,6 +19,7 @@
 #define TOGGLE_LED3         8
 #define READ_SW2            9
 #define READ_SW3            10
+#define READ_I              12
 
 #define REG_MAG_ADDR        0x3FFE
 
@@ -91,6 +92,13 @@ void VendorRequests(void) {
             BD[EP0IN].bytecount = 1;         // set EP0 IN byte count to 1
             BD[EP0IN].status = 0xC8;         // send packet as DATA1, set UOWN bit
             break;
+        case READ_I:
+            result.w = pin_read(&A[0]);
+            BD[EP0IN].bytecount = 2;
+            BD[EP0IN].address[0] = result.b[0];
+            BD[EP0IN].address[1] = result.b[1];
+            BD[EP0IN].status = 0xC8;         // send packet as DATA1, set UOWN bit
+            break;
         default:
             USB_error_flags |= 0x01;    // set Request Error Flag
     }
@@ -131,6 +139,8 @@ int16_t main(void) {
     ENC_SCK = &D[2];
     ENC_NCS = &D[3];
 
+
+
     pin_digitalOut(ENC_NCS);
     pin_set(ENC_NCS);
 
@@ -148,7 +158,7 @@ int16_t main(void) {
     }
     while (1) {
         ServiceUSB();                       // service any pending USB requests
-        drive(&m1, !sw_read(&sw1));
-        led_write(&led3, !sw_read(&sw1));
+
+        drive(&m1, .7);
     }
 }

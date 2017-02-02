@@ -1,5 +1,5 @@
 #include <p24FJ128GB206.h>
-//#include "config.h"
+//k#include "config.h"
 #include "common.h"
 #include "ui.h"
 #include "oc.h"
@@ -7,7 +7,7 @@
 #include "timer.h"
 #include "motor.h"
 
-Motor m1 = {{&D[7],&D[8]}, &oc7, &timer5, (int)25e3, 0, true};
+Motor m1 = {{&D[7],&D[8]}, &oc7, &timer5, (int)32e3, 0, true};
 Motor m2; // not used
 
 Dir dir(float f){
